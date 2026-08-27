@@ -770,49 +770,83 @@
 
     const isbn = termo.replace(/[-\s]/g,'');
     const isIsbn = /^\d{9,13}$/.test(isbn);
-    const query = isIsbn ? `isbn:${isbn}` : termo;
 
+    let resultados = [];
+
+    // 1) Open Library — aberta, sem chave, sem limite agressivo
     try{
-      const resp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=6&langRestrict=pt`);
-      if(!resp.ok) throw new Error('falha na requisição');
-      const data = await resp.json();
-      const itens = data.items || [];
-
-      if(itens.length === 0){
-        lookupStatus.textContent = 'Nada encontrado. Tente outro termo ou preencha à mão mesmo.';
-        return;
+      const url = isIsbn
+        ? `https://openlibrary.org/search.json?isbn=${isbn}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`
+        : `https://openlibrary.org/search.json?q=${encodeURIComponent(termo)}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`;
+      const resp = await fetch(url);
+      if(resp.ok){
+        const data = await resp.json();
+        resultados = (data.docs || []).map(doc => ({
+          titulo: doc.title || '',
+          autor: (doc.author_name || []).join(', '),
+          ano: doc.first_publish_year || '',
+          paginas: doc.number_of_pages_median || '',
+          editora: (doc.publisher || [])[0] || '',
+          capa: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : ''
+        }));
       }
-      lookupStatus.textContent = `${itens.length} resultado(s) — clique para preencher a ficha:`;
-
-      itens.forEach(item=>{
-        const info = item.volumeInfo || {};
-        const div = document.createElement('div');
-        div.className = 'lookup-item';
-        const capa = info.imageLinks ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail) : '';
-        const ano = info.publishedDate ? info.publishedDate.slice(0,4) : '';
-        div.innerHTML = `
-          ${capa ? `<img src="${capa.replace('http://','https://')}" alt="">` : `<div style="width:32px;height:46px;flex-shrink:0;background:#ddd2ac;"></div>`}
-          <div class="li-text">
-            <div class="li-title">${escapeHtml(info.title || 'Sem título')}</div>
-            <div class="li-meta">${escapeHtml((info.authors||[]).join(', '))}${ano ? ' · ' + ano : ''}</div>
-          </div>
-        `;
-        div.addEventListener('click', ()=>{
-          document.getElementById('titulo').value = info.title || '';
-          document.getElementById('autor').value = (info.authors || []).join(', ');
-          document.getElementById('ano').value = ano || '';
-          document.getElementById('paginas').value = info.pageCount || '';
-          document.getElementById('editora').value = info.publisher || '';
-          document.getElementById('capaUrl').value = capa ? capa.replace('http://','https://') : '';
-          lookupStatus.textContent = 'Preenchido! Confira os campos e ajuste o que precisar.';
-          lookupResults.innerHTML = '';
-        });
-        lookupResults.appendChild(div);
-      });
     }catch(err){
-      console.error(err);
-      lookupStatus.textContent = 'Não consegui buscar agora. Confira sua conexão ou preencha à mão.';
+      console.error('Open Library falhou:', err);
     }
+
+    // 2) Google Books — plano B, só se a Open Library não achou nada
+    if(resultados.length === 0){
+      try{
+        const query = isIsbn ? `isbn:${isbn}` : termo;
+        const resp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=6&langRestrict=pt`);
+        if(resp.ok){
+          const data = await resp.json();
+          resultados = (data.items || []).map(item=>{
+            const info = item.volumeInfo || {};
+            const capa = info.imageLinks ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail) : '';
+            return {
+              titulo: info.title || '',
+              autor: (info.authors || []).join(', '),
+              ano: info.publishedDate ? info.publishedDate.slice(0,4) : '',
+              paginas: info.pageCount || '',
+              editora: info.publisher || '',
+              capa: capa ? capa.replace('http://','https://') : ''
+            };
+          });
+        }
+      }catch(err){
+        console.error('Google Books também falhou:', err);
+      }
+    }
+
+    if(resultados.length === 0){
+      lookupStatus.textContent = 'Nada encontrado. Tente outro termo ou preencha à mão mesmo.';
+      return;
+    }
+
+    lookupStatus.textContent = `${resultados.length} resultado(s) — clique para preencher a ficha:`;
+    resultados.forEach(r=>{
+      const div = document.createElement('div');
+      div.className = 'lookup-item';
+      div.innerHTML = `
+        ${r.capa ? `<img src="${r.capa}" alt="">` : `<div style="width:32px;height:46px;flex-shrink:0;background:#ddd2ac;"></div>`}
+        <div class="li-text">
+          <div class="li-title">${escapeHtml(r.titulo || 'Sem título')}</div>
+          <div class="li-meta">${escapeHtml(r.autor)}${r.ano ? ' · ' + r.ano : ''}</div>
+        </div>
+      `;
+      div.addEventListener('click', ()=>{
+        document.getElementById('titulo').value = r.titulo || '';
+        document.getElementById('autor').value = r.autor || '';
+        document.getElementById('ano').value = r.ano || '';
+        document.getElementById('paginas').value = r.paginas || '';
+        document.getElementById('editora').value = r.editora || '';
+        document.getElementById('capaUrl').value = r.capa || '';
+        lookupStatus.textContent = 'Preenchido! Confira os campos e ajuste o que precisar.';
+        lookupResults.innerHTML = '';
+      });
+      lookupResults.appendChild(div);
+    });
   }
 
   lookupBtn.addEventListener('click', buscarLivro);
