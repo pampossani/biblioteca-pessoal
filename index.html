@@ -261,6 +261,25 @@
     flex-wrap:wrap;
     gap: 4px 10px;
   }
+  .card .serie{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--navy);
+    margin: 0 4px 6px;
+    font-weight:600;
+  }
+  .card .sem-exemplar{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--oxblood);
+    border: 1px dashed var(--oxblood);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin: 0 4px 8px;
+  }
   .card .leitura{
     font-family:'IBM Plex Mono', monospace;
     font-size: 11.5px;
@@ -309,9 +328,11 @@
   .card-cover::after{ content:""; }
   .card.has-cover h3{ margin-left: 84px; }
   .card.has-cover .autor,
-  .card.has-cover .meta{ margin-left: 84px; }
+  .card.has-cover .meta,
+  .card.has-cover .serie{ margin-left: 84px; }
   .card.has-cover .leitura,
-  .card.has-cover .notas{ margin-left: 4px; }
+  .card.has-cover .notas,
+  .card.has-cover .sem-exemplar{ margin-left: 4px; }
 
   /* ---------- Modal ---------- */
   .modal-overlay{
@@ -489,7 +510,7 @@
   <div class="controls">
     <div class="tabs" id="tabs"></div>
     <div class="right-controls">
-      <input type="text" class="search" id="searchInput" placeholder="buscar título ou autor...">
+      <input type="text" class="search" id="searchInput" placeholder="buscar título, autor ou série...">
       <button class="pill ghost" id="exportBtn">exportar .json</button>
       <button class="pill ghost" id="importBtn">importar .json</button>
       <button class="pill primary" id="addBtn">+ nova ficha</button>
@@ -541,6 +562,20 @@
         <div class="field">
           <label for="editora">Editora</label>
           <input type="text" id="editora">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="serie">Série</label>
+            <input type="text" id="serie" placeholder="ex: Harry Potter">
+          </div>
+          <div class="field">
+            <label for="serieNumero">Nº na série</label>
+            <input type="number" id="serieNumero" placeholder="ex: 3" min="0">
+          </div>
+        </div>
+        <div class="field" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="possuiFisico" style="width:auto;" checked>
+          <label for="possuiFisico" style="margin:0;">Já tenho o exemplar físico</label>
         </div>
         <div class="field-row">
           <div class="field">
@@ -632,12 +667,14 @@
     const paginasLidas = lidos.reduce((sum,l)=> sum + (parseInt(l.paginas)||0), 0);
     const trocar = livros.filter(l=>l.status==='trocar').length;
     const desejados = livros.filter(l=>l.status==='quero-ler').length;
+    const paraComprar = livros.filter(l=>l.possuiFisico === false).length;
 
     statsEl.innerHTML = `
       <div class="stat-tag"><b>${total}</b> no total</div>
       <div class="stat-tag"><b>${lidos.length}</b> lidos</div>
       <div class="stat-tag"><b>${paginasLidas.toLocaleString('pt-BR')}</b> páginas lidas</div>
       <div class="stat-tag"><b>${desejados}</b> na fila</div>
+      <div class="stat-tag"><b>${paraComprar}</b> ainda não tenho</div>
       <div class="stat-tag"><b>${trocar}</b> para trocar</div>
     `;
     document.getElementById('drawerCount').textContent =
@@ -664,7 +701,8 @@
       const q = busca.trim().toLowerCase();
       lista = lista.filter(l=>
         (l.titulo||'').toLowerCase().includes(q) ||
-        (l.autor||'').toLowerCase().includes(q)
+        (l.autor||'').toLowerCase().includes(q) ||
+        (l.serie||'').toLowerCase().includes(q)
       );
     }
 
@@ -694,7 +732,9 @@
         ${livro.capaUrl ? `<img class="card-cover" src="${escapeHtml(livro.capaUrl)}" alt="">` : ''}
         <h3>${escapeHtml(livro.titulo)}</h3>
         ${livro.autor ? `<div class="autor">${escapeHtml(livro.autor)}</div>` : ''}
+        ${livro.serie ? `<div class="serie">${escapeHtml(livro.serie)}${livro.serieNumero ? ' — #' + escapeHtml(String(livro.serieNumero)) : ''}</div>` : ''}
         ${metaParts.length ? `<div class="meta">${metaParts.map(escapeHtml).join(' &middot; ')}</div>` : ''}
+        ${livro.possuiFisico === false ? `<div class="sem-exemplar">ainda não tenho</div>` : ''}
         ${livro.status === 'lido' && livro.dataLeitura ? `<div class="leitura">lido em ${formatDataLeitura(livro.dataLeitura)}</div>` : ''}
         ${livro.notas ? `<div class="notas">${escapeHtml(livro.notas)}</div>` : ''}
         <div class="card-actions">
@@ -738,6 +778,9 @@
     document.getElementById('ano').value = livro ? livro.ano || '' : '';
     document.getElementById('paginas').value = livro ? livro.paginas || '' : '';
     document.getElementById('editora').value = livro ? livro.editora || '' : '';
+    document.getElementById('serie').value = livro ? livro.serie || '' : '';
+    document.getElementById('serieNumero').value = livro ? livro.serieNumero || '' : '';
+    document.getElementById('possuiFisico').checked = livro ? (livro.possuiFisico !== false) : true;
     document.getElementById('status').value = livro ? livro.status : 'quero-ler';
     document.getElementById('dataLeitura').value = livro ? livro.dataLeitura || '' : '';
     document.getElementById('notas').value = livro ? livro.notas || '' : '';
@@ -887,6 +930,9 @@
       ano: document.getElementById('ano').value,
       paginas: document.getElementById('paginas').value,
       editora: document.getElementById('editora').value.trim(),
+      serie: document.getElementById('serie').value.trim(),
+      serieNumero: document.getElementById('serieNumero').value,
+      possuiFisico: document.getElementById('possuiFisico').checked,
       status: document.getElementById('status').value,
       dataLeitura: document.getElementById('status').value === 'lido' ? document.getElementById('dataLeitura').value : '',
       notas: document.getElementById('notas').value.trim(),
