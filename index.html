@@ -668,9 +668,11 @@
     const trocar = livros.filter(l=>l.status==='trocar').length;
     const desejados = livros.filter(l=>l.status==='quero-ler').length;
     const paraComprar = livros.filter(l=>l.possuiFisico === false).length;
+    const possuidos = livros.filter(l=>l.possuiFisico !== false).length;
 
     statsEl.innerHTML = `
       <div class="stat-tag"><b>${total}</b> no total</div>
+      <div class="stat-tag"><b>${possuidos}</b> na estante</div>
       <div class="stat-tag"><b>${lidos.length}</b> lidos</div>
       <div class="stat-tag"><b>${paginasLidas.toLocaleString('pt-BR')}</b> páginas lidas</div>
       <div class="stat-tag"><b>${desejados}</b> na fila</div>
