@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minha Estante — Catálogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page-bg: #1f3329;
+    --page-bg-2: #1a2b23;
+    --card-bg: #f5eedb;
+    --card-bg-alt: #efe6cd;
+    --ink: #2b2620;
+    --ink-soft: #6b6353;
+    --oxblood: #7a2e2e;
+    --gold: #b08d57;
+    --forest: #2f4a3c;
+    --navy: #2e4057;
+    --brass: #c9a15a;
+    --paper-line: rgba(43,38,32,0.12);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+
+  body{
+    background:
+      radial-gradient(ellipse at top, var(--page-bg-2), var(--page-bg) 70%);
+    color: var(--card-bg);
+    font-family: 'Inter', sans-serif;
+    min-height:100vh;
+    padding: 32px 20px 80px;
+  }
+
+  /* ---------- Header / drawer label ---------- */
+  .drawer-label{
+    max-width: 980px;
+    margin: 0 auto 28px;
+    text-align:center;
+  }
+  .drawer-plate{
+    display:inline-block;
+    background: linear-gradient(180deg, #d9b877, var(--brass));
+    color: #2b2004;
+    padding: 6px 22px;
+    border-radius: 3px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4);
+    margin-bottom: 14px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: clamp(32px, 5vw, 52px);
+    margin: 0 0 6px;
+    color: var(--card-bg);
+    letter-spacing: 0.5px;
+  }
+  .subtitle{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: rgba(245,238,219,0.55);
+    text-transform: uppercase;
+  }
+
+  /* ---------- Stats row ---------- */
+  .stats{
+    max-width: 980px;
+    margin: 26px auto;
+    display:flex;
+    flex-wrap:wrap;
+    gap: 10px;
+    justify-content:center;
+  }
+  .stat-tag{
+    background: rgba(245,238,219,0.08);
+    border: 1px solid rgba(245,238,219,0.18);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--card-bg);
+    display:flex;
+    align-items:baseline;
+    gap:7px;
+  }
+  .stat-tag b{
+    font-family:'Fraunces', serif;
+    font-size: 16px;
+    color: var(--brass);
+  }
+
+  /* ---------- Controls: tabs + search + add ---------- */
+  .controls{
+    max-width: 980px;
+    margin: 0 auto 6px;
+    display:flex;
+    flex-wrap:wrap;
+    gap: 14px;
+    align-items:flex-end;
+    justify-content:space-between;
+  }
+  .tabs{
+    display:flex;
+    flex-wrap:wrap;
+  }
+  .tab{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--card-bg-alt);
+    color: var(--ink-soft);
+    border: none;
+    padding: 9px 16px 8px;
+    cursor: pointer;
+    clip-path: polygon(8% 0, 100% 0, 92% 100%, 0% 100%);
+    margin-right: -6px;
+    transition: transform .15s ease, background .15s ease, color .15s ease;
+    position:relative;
+    top: 4px;
+  }
+  .tab:hover{ top:1px; }
+  .tab.active{
+    background: var(--card-bg);
+    color: var(--ink);
+    font-weight:600;
+    top:0;
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
+  }
+
+  .right-controls{
+    display:flex;
+    gap: 10px;
+    flex-wrap:wrap;
+  }
+  input[type="text"].search{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    background: rgba(245,238,219,0.08);
+    border: 1px solid rgba(245,238,219,0.25);
+    color: var(--card-bg);
+    padding: 9px 12px;
+    border-radius: 4px;
+    min-width: 200px;
+  }
+  input[type="text"].search::placeholder{ color: rgba(245,238,219,0.4); }
+
+  button.pill{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size: 13px;
+    border: none;
+    border-radius: 4px;
+    padding: 9px 16px;
+    cursor:pointer;
+    transition: filter .15s ease, transform .15s ease;
+  }
+  button.pill:hover{ filter: brightness(1.08); transform: translateY(-1px); }
+  .pill.primary{ background: var(--brass); color:#2b2004; }
+  .pill.ghost{ background: rgba(245,238,219,0.08); color: var(--card-bg); border:1px solid rgba(245,238,219,0.25); }
+
+  /* ---------- Shelf / card grid ---------- */
+  .shelf{
+    max-width: 980px;
+    margin: 26px auto 0;
+    background: rgba(0,0,0,0.12);
+    border-radius: 8px;
+    padding: 26px;
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 22px;
+    min-height: 140px;
+  }
+
+  .empty-state{
+    grid-column: 1 / -1;
+    text-align:center;
+    padding: 40px 20px;
+    color: rgba(245,238,219,0.6);
+    font-family:'Fraunces', serif;
+    font-style: italic;
+    font-size: 17px;
+  }
+
+  /* ---------- Index card ---------- */
+  .card{
+    position:relative;
+    background: var(--card-bg);
+    color: var(--ink);
+    border-radius: 3px;
+    padding: 26px 20px 18px;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.5) inset;
+    transform: rotate(var(--tilt, 0deg));
+    transition: transform .15s ease, box-shadow .15s ease;
+    background-image: repeating-linear-gradient(var(--card-bg) 0 27px, var(--paper-line) 27px 28px);
+    background-position: 0 46px;
+  }
+  .card:hover{
+    transform: rotate(0deg) translateY(-3px);
+    box-shadow: 0 14px 24px rgba(0,0,0,0.4);
+  }
+  .card::before, .card::after{
+    content:"";
+    position:absolute;
+    top: 10px;
+    width: 13px; height:13px;
+    border-radius:50%;
+    background: var(--page-bg-2);
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.6);
+  }
+  .card::before{ left: 16px; }
+  .card::after{ right: 16px; }
+
+  .stamp{
+    position:absolute;
+    top: 20px; right: 18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight:600;
+    letter-spacing: 1.5px;
+    text-transform:uppercase;
+    padding: 4px 9px;
+    border: 2px solid currentColor;
+    border-radius: 3px;
+    transform: rotate(9deg);
+    mix-blend-mode: multiply;
+    opacity: 0.9;
+  }
+  .stamp.lido{ color: var(--forest); }
+  .stamp.lendo{ color: var(--navy); }
+  .stamp.quero-ler{ color: var(--gold); }
+  .stamp.trocar{ color: var(--oxblood); }
+
+  .card h3{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size: 19px;
+    margin: 6px 70px 2px 4px;
+    line-height:1.25;
+  }
+  .card .autor{
+    font-family:'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0 4px 12px;
+  }
+  .card .meta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin: 0 4px 6px;
+    display:flex;
+    flex-wrap:wrap;
+    gap: 4px 10px;
+  }
+  .card .leitura{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--forest);
+    margin: 8px 4px 0;
+  }
+  .card .notas{
+    font-family:'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 10px 4px 0;
+    font-style: italic;
+  }
+
+  .card-actions{
+    display:flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--paper-line);
+  }
+  .card-actions button{
+    background:none;
+    border:none;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    text-transform:uppercase;
+    color: var(--ink-soft);
+    cursor:pointer;
+    padding: 2px 0;
+  }
+  .card-actions button:hover{ color: var(--ink); text-decoration: underline; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background: rgba(10,15,12,0.6);
+    display:none;
+    align-items:center; justify-content:center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background: var(--card-bg);
+    color: var(--ink);
+    width: 100%; max-width: 480px;
+    border-radius: 4px;
+    padding: 28px 26px 22px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    max-height: 88vh;
+    overflow-y:auto;
+    position:relative;
+  }
+  .modal::before, .modal::after{
+    content:"";
+    position:absolute; top:10px;
+    width:13px; height:13px; border-radius:50%;
+    background: var(--page-bg-2);
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.6);
+  }
+  .modal::before{ left:16px; }
+  .modal::after{ right:16px; }
+  .modal h2{
+    font-family:'Fraunces', serif;
+    font-size: 22px;
+    margin: 10px 0 18px;
+  }
+  .field{ margin-bottom: 14px; }
+  .field label{
+    display:block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-size: 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    background: #fffdf6;
+    color: var(--ink);
+  }
+  .field textarea{ resize:vertical; min-height: 50px; font-family:'Inter',sans-serif; }
+  .field-row{ display:flex; gap: 12px; }
+  .field-row .field{ flex:1; }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  /* ---------- Footer utility row ---------- */
+  .footer-row{
+    max-width: 980px;
+    margin: 22px auto 0;
+    display:flex;
+    justify-content:center;
+    gap: 12px;
+    flex-wrap:wrap;
+  }
+  .footer-row .note{
+    width:100%;
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: rgba(245,238,219,0.4);
+    margin-top: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="drawer-label">
+    <div class="drawer-plate" id="drawerCount">gaveta 1</div>
+    <h1>Minha Estante</h1>
+    <div class="subtitle">catálogo dos livros físicos</div>
+  </div>
+
+  <div class="stats" id="statsRow"></div>
+
+  <div class="controls">
+    <div class="tabs" id="tabs"></div>
+    <div class="right-controls">
+      <input type="text" class="search" id="searchInput" placeholder="buscar título ou autor...">
+      <button class="pill ghost" id="exportBtn">exportar .json</button>
+      <button class="pill ghost" id="importBtn">importar .json</button>
+      <button class="pill primary" id="addBtn">+ nova ficha</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+    </div>
+  </div>
+
+  <div class="shelf" id="shelf"></div>
+
+  <div class="footer-row">
+    <div class="note">os dados ficam salvos neste navegador · use "exportar" de vez em quando para ter um backup</div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h2 id="modalTitle">Nova ficha</h2>
+      <form id="bookForm">
+        <input type="hidden" id="bookId">
+        <div class="field">
+          <label for="titulo">Título</label>
+          <input type="text" id="titulo" required>
+        </div>
+        <div class="field">
+          <label for="autor">Autor</label>
+          <input type="text" id="autor">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="ano">Ano da edição</label>
+            <input type="number" id="ano" placeholder="ex: 2018">
+          </div>
+          <div class="field">
+            <label for="paginas">Páginas</label>
+            <input type="number" id="paginas" placeholder="ex: 320">
+          </div>
+        </div>
+        <div class="field">
+          <label for="editora">Editora</label>
+          <input type="text" id="editora">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="status">Status</label>
+            <select id="status">
+              <option value="quero-ler">Quero ler</option>
+              <option value="lendo">Lendo</option>
+              <option value="lido">Lido</option>
+              <option value="trocar">Para trocar</option>
+            </select>
+          </div>
+          <div class="field" id="dataLeituraField">
+            <label for="dataLeitura">Lido em (mês/ano)</label>
+            <input type="month" id="dataLeitura">
+          </div>
+        </div>
+        <div class="field">
+          <label for="notas">Notas (opcional)</label>
+          <textarea id="notas" placeholder="edição, capa, empréstimo, o que quiser anotar..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="pill ghost" id="cancelBtn">cancelar</button>
+          <button type="submit" class="pill primary" id="saveBtn">salvar ficha</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'biblioteca-pessoal-livros';
+  let livros = [];
+  let filtroStatus = 'todos';
+  let busca = '';
+
+  const statusLabels = {
+    'lido': 'Lido',
+    'lendo': 'Lendo',
+    'quero-ler': 'Quero ler',
+    'trocar': 'Para trocar'
+  };
+  const tabDefs = [
+    {key:'todos', label:'Todos'},
+    {key:'lido', label:'Lidos'},
+    {key:'lendo', label:'Lendo'},
+    {key:'quero-ler', label:'Quero ler'},
+    {key:'trocar', label:'Para trocar'}
+  ];
+
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      livros = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      console.error('Não foi possível ler os dados salvos:', e);
+      livros = [];
+    }
+  }
+
+  function saveData(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(livros));
+    }catch(e){
+      console.error('Não foi possível salvar os dados:', e);
+      alert('Não consegui salvar no navegador. Exporte seu catálogo em .json para não perder nada.');
+    }
+  }
+
+  function uid(){
+    return 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+  }
+
+  function renderTabs(){
+    const tabsEl = document.getElementById('tabs');
+    tabsEl.innerHTML = '';
+    tabDefs.forEach(t=>{
+      const btn = document.createElement('button');
+      btn.className = 'tab' + (filtroStatus === t.key ? ' active' : '');
+      btn.textContent = t.label;
+      btn.addEventListener('click', ()=>{ filtroStatus = t.key; render(); });
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function renderStats(){
+    const statsEl = document.getElementById('statsRow');
+    const total = livros.length;
+    const lidos = livros.filter(l=>l.status==='lido');
+    const paginasLidas = lidos.reduce((sum,l)=> sum + (parseInt(l.paginas)||0), 0);
+    const trocar = livros.filter(l=>l.status==='trocar').length;
+    const desejados = livros.filter(l=>l.status==='quero-ler').length;
+
+    statsEl.innerHTML = `
+      <div class="stat-tag"><b>${total}</b> no total</div>
+      <div class="stat-tag"><b>${lidos.length}</b> lidos</div>
+      <div class="stat-tag"><b>${paginasLidas.toLocaleString('pt-BR')}</b> páginas lidas</div>
+      <div class="stat-tag"><b>${desejados}</b> na fila</div>
+      <div class="stat-tag"><b>${trocar}</b> para trocar</div>
+    `;
+    document.getElementById('drawerCount').textContent =
+      total === 0 ? 'gaveta vazia' : `gaveta com ${total} ${total===1?'ficha':'fichas'}`;
+  }
+
+  function formatDataLeitura(v){
+    if(!v) return '';
+    const [ano, mes] = v.split('-');
+    const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    const idx = parseInt(mes,10) - 1;
+    return `${meses[idx] || mes}/${ano}`;
+  }
+
+  function renderShelf(){
+    const shelf = document.getElementById('shelf');
+    shelf.innerHTML = '';
+
+    let lista = livros.slice();
+    if(filtroStatus !== 'todos'){
+      lista = lista.filter(l=> l.status === filtroStatus);
+    }
+    if(busca.trim()){
+      const q = busca.trim().toLowerCase();
+      lista = lista.filter(l=>
+        (l.titulo||'').toLowerCase().includes(q) ||
+        (l.autor||'').toLowerCase().includes(q)
+      );
+    }
+
+    if(lista.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = livros.length === 0
+        ? 'Sua estante está vazia. Que tal catalogar o primeiro livro?'
+        : 'Nenhuma ficha encontrada com esse filtro.';
+      shelf.appendChild(empty);
+      return;
+    }
+
+    lista.forEach((livro, i)=>{
+      const card = document.createElement('div');
+      card.className = 'card';
+      const tilt = ((i % 5) - 2) * 0.4;
+      card.style.setProperty('--tilt', tilt + 'deg');
+
+      const metaParts = [];
+      if(livro.ano) metaParts.push('ed. ' + livro.ano);
+      if(livro.paginas) metaParts.push(livro.paginas + ' pág.');
+      if(livro.editora) metaParts.push(livro.editora);
+
+      card.innerHTML = `
+        <span class="stamp ${livro.status}">${statusLabels[livro.status] || livro.status}</span>
+        <h3>${escapeHtml(livro.titulo)}</h3>
+        ${livro.autor ? `<div class="autor">${escapeHtml(livro.autor)}</div>` : ''}
+        ${metaParts.length ? `<div class="meta">${metaParts.map(escapeHtml).join(' &middot; ')}</div>` : ''}
+        ${livro.status === 'lido' && livro.dataLeitura ? `<div class="leitura">lido em ${formatDataLeitura(livro.dataLeitura)}</div>` : ''}
+        ${livro.notas ? `<div class="notas">${escapeHtml(livro.notas)}</div>` : ''}
+        <div class="card-actions">
+          <button data-action="edit" data-id="${livro.id}">editar</button>
+          <button data-action="delete" data-id="${livro.id}">remover</button>
+        </div>
+      `;
+      shelf.appendChild(card);
+    });
+  }
+
+  function escapeHtml(str){
+    return String(str ?? '').replace(/[&<>"']/g, s=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[s]));
+  }
+
+  function render(){
+    renderTabs();
+    renderStats();
+    renderShelf();
+  }
+
+  // ---------- Modal handling ----------
+  const overlay = document.getElementById('modalOverlay');
+  const form = document.getElementById('bookForm');
+  const statusSelect = document.getElementById('status');
+  const dataLeituraField = document.getElementById('dataLeituraField');
+
+  function toggleDataLeituraField(){
+    dataLeituraField.style.display = statusSelect.value === 'lido' ? 'block' : 'none';
+  }
+  statusSelect.addEventListener('change', toggleDataLeituraField);
+
+  function openModal(livro){
+    document.getElementById('modalTitle').textContent = livro ? 'Editar ficha' : 'Nova ficha';
+    document.getElementById('bookId').value = livro ? livro.id : '';
+    document.getElementById('titulo').value = livro ? livro.titulo : '';
+    document.getElementById('autor').value = livro ? livro.autor || '' : '';
+    document.getElementById('ano').value = livro ? livro.ano || '' : '';
+    document.getElementById('paginas').value = livro ? livro.paginas || '' : '';
+    document.getElementById('editora').value = livro ? livro.editora || '' : '';
+    document.getElementById('status').value = livro ? livro.status : 'quero-ler';
+    document.getElementById('dataLeitura').value = livro ? livro.dataLeitura || '' : '';
+    document.getElementById('notas').value = livro ? livro.notas || '' : '';
+    toggleDataLeituraField();
+    overlay.classList.add('open');
+    document.getElementById('titulo').focus();
+  }
+
+  function closeModal(){
+    overlay.classList.remove('open');
+    form.reset();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', ()=> openModal(null));
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
+
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const id = document.getElementById('bookId').value;
+    const dados = {
+      titulo: document.getElementById('titulo').value.trim(),
+      autor: document.getElementById('autor').value.trim(),
+      ano: document.getElementById('ano').value,
+      paginas: document.getElementById('paginas').value,
+      editora: document.getElementById('editora').value.trim(),
+      status: document.getElementById('status').value,
+      dataLeitura: document.getElementById('status').value === 'lido' ? document.getElementById('dataLeitura').value : '',
+      notas: document.getElementById('notas').value.trim()
+    };
+    if(!dados.titulo){ return; }
+
+    if(id){
+      const idx = livros.findIndex(l=>l.id === id);
+      if(idx > -1) livros[idx] = {...livros[idx], ...dados};
+    } else {
+      dados.id = uid();
+      livros.unshift(dados);
+    }
+    saveData();
+    closeModal();
+    render();
+  });
+
+  document.getElementById('shelf').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const livro = livros.find(l=>l.id === id);
+    if(btn.dataset.action === 'edit'){
+      openModal(livro);
+    } else if(btn.dataset.action === 'delete'){
+      if(confirm(`Remover "${livro.titulo}" da estante?`)){
+        livros = livros.filter(l=>l.id !== id);
+        saveData();
+        render();
+      }
+    }
+  });
+
+  document.getElementById('searchInput').addEventListener('input', (e)=>{
+    busca = e.target.value;
+    renderShelf();
+  });
+
+  // ---------- Export / Import ----------
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(livros, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'minha-estante.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      try{
+        const dados = JSON.parse(ev.target.result);
+        if(!Array.isArray(dados)) throw new Error('formato inválido');
+        const confirmar = livros.length === 0 || confirm('Isso vai substituir os livros já cadastrados aqui. Continuar?');
+        if(confirmar){
+          livros = dados.map(l=> ({...l, id: l.id || uid()}));
+          saveData();
+          render();
+        }
+      }catch(err){
+        alert('Não consegui ler esse arquivo. Confira se é um .json exportado por esta página.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- Init ----------
+  loadData();
+  render();
+})();
+</script>
+</body>
+</html>
