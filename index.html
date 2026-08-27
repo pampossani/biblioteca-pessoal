@@ -777,7 +777,7 @@
     try{
       const url = isIsbn
         ? `https://openlibrary.org/search.json?isbn=${isbn}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`
-        : `https://openlibrary.org/search.json?q=${encodeURIComponent(termo)}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`;
+        : `https://openlibrary.org/search.json?q=${encodeURIComponent(termo + ' language:por')}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`;
       const resp = await fetch(url);
       if(resp.ok){
         const data = await resp.json();
@@ -792,6 +792,26 @@
       }
     }catch(err){
       console.error('Open Library falhou:', err);
+    }
+
+    // 1b) Se a busca em português não achou nada, tenta de novo sem o filtro de idioma
+    if(resultados.length === 0 && !isIsbn){
+      try{
+        const resp2 = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(termo)}&fields=title,author_name,first_publish_year,publisher,number_of_pages_median,cover_i&limit=6`);
+        if(resp2.ok){
+          const data2 = await resp2.json();
+          resultados = (data2.docs || []).map(doc => ({
+            titulo: doc.title || '',
+            autor: (doc.author_name || []).join(', '),
+            ano: doc.first_publish_year || '',
+            paginas: doc.number_of_pages_median || '',
+            editora: (doc.publisher || [])[0] || '',
+            capa: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : ''
+          }));
+        }
+      }catch(err){
+        console.error('Segunda tentativa na Open Library falhou:', err);
+      }
     }
 
     // 2) Google Books — plano B, só se a Open Library não achou nada
