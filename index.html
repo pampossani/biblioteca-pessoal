@@ -295,6 +295,24 @@
   }
   .card-actions button:hover{ color: var(--ink); text-decoration: underline; }
 
+  /* ---------- Cover thumbnail (taped onto the card) ---------- */
+  .card-cover{
+    position:absolute;
+    top: 28px; left: 16px;
+    width: 56px; height: 82px;
+    object-fit: cover;
+    background: var(--card-bg-alt);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.35);
+    transform: rotate(-5deg);
+    border: 3px solid #fffdf6;
+  }
+  .card-cover::after{ content:""; }
+  .card.has-cover h3{ margin-left: 84px; }
+  .card.has-cover .autor,
+  .card.has-cover .meta{ margin-left: 84px; }
+  .card.has-cover .leitura,
+  .card.has-cover .notas{ margin-left: 4px; }
+
   /* ---------- Modal ---------- */
   .modal-overlay{
     position:fixed; inset:0;
@@ -330,6 +348,81 @@
     font-size: 22px;
     margin: 10px 0 18px;
   }
+  .lookup{
+    position:relative;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed var(--paper-line);
+  }
+  .lookup label{
+    display:block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .lookup-row{ display:flex; gap: 8px; }
+  .lookup-row input{
+    flex:1;
+    font-family:'Inter', sans-serif;
+    font-size: 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    background: #fffdf6;
+    color: var(--ink);
+  }
+  .lookup-row button{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size: 13px;
+    border:none;
+    border-radius: 3px;
+    padding: 9px 14px;
+    background: var(--forest);
+    color: var(--card-bg);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .lookup-row button:hover{ filter: brightness(1.15); }
+  .lookup-status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  .lookup-results{
+    margin-top: 8px;
+    max-height: 220px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+  .lookup-item{
+    display:flex;
+    gap: 10px;
+    align-items:center;
+    background: var(--card-bg-alt);
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    padding: 7px 9px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .lookup-item:hover{ background: #e6dcbc; }
+  .lookup-item img{
+    width: 32px; height: 46px;
+    object-fit:cover;
+    background: #ddd2ac;
+    flex-shrink:0;
+  }
+  .lookup-item .li-text{ font-size: 12.5px; line-height:1.35; }
+  .lookup-item .li-title{ font-weight:600; }
+  .lookup-item .li-meta{ color: var(--ink-soft); font-family:'IBM Plex Mono', monospace; font-size:11px; }
+
   .field{ margin-bottom: 14px; }
   .field label{
     display:block;
@@ -415,6 +508,18 @@
       <h2 id="modalTitle">Nova ficha</h2>
       <form id="bookForm">
         <input type="hidden" id="bookId">
+        <input type="hidden" id="capaUrl">
+
+        <div class="lookup">
+          <label for="lookupInput">Buscar livro (título ou ISBN)</label>
+          <div class="lookup-row">
+            <input type="text" id="lookupInput" placeholder="ex: Torto Arado, ou 9788535932307">
+            <button type="button" id="lookupBtn">buscar</button>
+          </div>
+          <div class="lookup-status" id="lookupStatus"></div>
+          <div class="lookup-results" id="lookupResults"></div>
+        </div>
+
         <div class="field">
           <label for="titulo">Título</label>
           <input type="text" id="titulo" required>
@@ -575,7 +680,7 @@
 
     lista.forEach((livro, i)=>{
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card' + (livro.capaUrl ? ' has-cover' : '');
       const tilt = ((i % 5) - 2) * 0.4;
       card.style.setProperty('--tilt', tilt + 'deg');
 
@@ -586,6 +691,7 @@
 
       card.innerHTML = `
         <span class="stamp ${livro.status}">${statusLabels[livro.status] || livro.status}</span>
+        ${livro.capaUrl ? `<img class="card-cover" src="${escapeHtml(livro.capaUrl)}" alt="">` : ''}
         <h3>${escapeHtml(livro.titulo)}</h3>
         ${livro.autor ? `<div class="autor">${escapeHtml(livro.autor)}</div>` : ''}
         ${metaParts.length ? `<div class="meta">${metaParts.map(escapeHtml).join(' &middot; ')}</div>` : ''}
@@ -626,6 +732,7 @@
   function openModal(livro){
     document.getElementById('modalTitle').textContent = livro ? 'Editar ficha' : 'Nova ficha';
     document.getElementById('bookId').value = livro ? livro.id : '';
+    document.getElementById('capaUrl').value = livro ? livro.capaUrl || '' : '';
     document.getElementById('titulo').value = livro ? livro.titulo : '';
     document.getElementById('autor').value = livro ? livro.autor || '' : '';
     document.getElementById('ano').value = livro ? livro.ano || '' : '';
@@ -634,6 +741,9 @@
     document.getElementById('status').value = livro ? livro.status : 'quero-ler';
     document.getElementById('dataLeitura').value = livro ? livro.dataLeitura || '' : '';
     document.getElementById('notas').value = livro ? livro.notas || '' : '';
+    document.getElementById('lookupInput').value = '';
+    document.getElementById('lookupStatus').textContent = '';
+    document.getElementById('lookupResults').innerHTML = '';
     toggleDataLeituraField();
     overlay.classList.add('open');
     document.getElementById('titulo').focus();
@@ -642,7 +752,73 @@
   function closeModal(){
     overlay.classList.remove('open');
     form.reset();
+    document.getElementById('lookupResults').innerHTML = '';
+    document.getElementById('lookupStatus').textContent = '';
   }
+
+  // ---------- Book lookup (Google Books API) ----------
+  const lookupInput = document.getElementById('lookupInput');
+  const lookupBtn = document.getElementById('lookupBtn');
+  const lookupStatus = document.getElementById('lookupStatus');
+  const lookupResults = document.getElementById('lookupResults');
+
+  async function buscarLivro(){
+    const termo = lookupInput.value.trim();
+    if(!termo){ return; }
+    lookupStatus.textContent = 'buscando...';
+    lookupResults.innerHTML = '';
+
+    const isbn = termo.replace(/[-\s]/g,'');
+    const isIsbn = /^\d{9,13}$/.test(isbn);
+    const query = isIsbn ? `isbn:${isbn}` : termo;
+
+    try{
+      const resp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=6&langRestrict=pt`);
+      if(!resp.ok) throw new Error('falha na requisição');
+      const data = await resp.json();
+      const itens = data.items || [];
+
+      if(itens.length === 0){
+        lookupStatus.textContent = 'Nada encontrado. Tente outro termo ou preencha à mão mesmo.';
+        return;
+      }
+      lookupStatus.textContent = `${itens.length} resultado(s) — clique para preencher a ficha:`;
+
+      itens.forEach(item=>{
+        const info = item.volumeInfo || {};
+        const div = document.createElement('div');
+        div.className = 'lookup-item';
+        const capa = info.imageLinks ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail) : '';
+        const ano = info.publishedDate ? info.publishedDate.slice(0,4) : '';
+        div.innerHTML = `
+          ${capa ? `<img src="${capa.replace('http://','https://')}" alt="">` : `<div style="width:32px;height:46px;flex-shrink:0;background:#ddd2ac;"></div>`}
+          <div class="li-text">
+            <div class="li-title">${escapeHtml(info.title || 'Sem título')}</div>
+            <div class="li-meta">${escapeHtml((info.authors||[]).join(', '))}${ano ? ' · ' + ano : ''}</div>
+          </div>
+        `;
+        div.addEventListener('click', ()=>{
+          document.getElementById('titulo').value = info.title || '';
+          document.getElementById('autor').value = (info.authors || []).join(', ');
+          document.getElementById('ano').value = ano || '';
+          document.getElementById('paginas').value = info.pageCount || '';
+          document.getElementById('editora').value = info.publisher || '';
+          document.getElementById('capaUrl').value = capa ? capa.replace('http://','https://') : '';
+          lookupStatus.textContent = 'Preenchido! Confira os campos e ajuste o que precisar.';
+          lookupResults.innerHTML = '';
+        });
+        lookupResults.appendChild(div);
+      });
+    }catch(err){
+      console.error(err);
+      lookupStatus.textContent = 'Não consegui buscar agora. Confira sua conexão ou preencha à mão.';
+    }
+  }
+
+  lookupBtn.addEventListener('click', buscarLivro);
+  lookupInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); buscarLivro(); }
+  });
 
   document.getElementById('addBtn').addEventListener('click', ()=> openModal(null));
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
@@ -659,7 +835,8 @@
       editora: document.getElementById('editora').value.trim(),
       status: document.getElementById('status').value,
       dataLeitura: document.getElementById('status').value === 'lido' ? document.getElementById('dataLeitura').value : '',
-      notas: document.getElementById('notas').value.trim()
+      notas: document.getElementById('notas').value.trim(),
+      capaUrl: document.getElementById('capaUrl').value.trim()
     };
     if(!dados.titulo){ return; }
 
