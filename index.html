@@ -6,6 +6,7 @@
 <title>Minha Estante — Catálogo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
   :root{
     --page-bg: #1f3329;
@@ -513,8 +514,12 @@
       <input type="text" class="search" id="searchInput" placeholder="buscar título, autor ou série...">
       <button class="pill ghost" id="exportBtn">exportar .json</button>
       <button class="pill ghost" id="importBtn">importar .json</button>
+      <button class="pill ghost" id="importGoodreadsBtn">importar goodreads (csv)</button>
+      <button class="pill ghost" id="importGenericBtn">importar outro csv</button>
       <button class="pill primary" id="addBtn">+ nova ficha</button>
       <input type="file" id="importFile" accept="application/json" style="display:none">
+      <input type="file" id="importGoodreadsFile" accept=".csv" style="display:none">
+      <input type="file" id="importGenericFile" accept=".csv" style="display:none">
     </div>
   </div>
 
@@ -601,6 +606,39 @@
           <button type="submit" class="pill primary" id="saveBtn">salvar ficha</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="csvMapOverlay">
+    <div class="modal">
+      <h2>Importar CSV de outro app</h2>
+      <p style="font-family:'Inter',sans-serif; font-size:13px; color:var(--ink-soft); margin-top:-8px;">
+        Diga qual coluna do seu arquivo corresponde a cada campo. Deixe em branco o que não existir no seu CSV.
+      </p>
+      <div id="csvMapFields"></div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="csvStatusPadrao">Status para todos os importados</label>
+          <select id="csvStatusPadrao">
+            <option value="quero-ler">Quero ler</option>
+            <option value="lendo">Lendo</option>
+            <option value="lido">Lido</option>
+            <option value="trocar">Para trocar</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; align-items:center; gap:8px; margin-top:22px;">
+          <input type="checkbox" id="csvPossuiFisico" style="width:auto;" checked>
+          <label for="csvPossuiFisico" style="margin:0;">Marcar como "já tenho o exemplar físico"</label>
+        </div>
+      </div>
+
+      <div class="lookup-status" id="csvMapStatus"></div>
+
+      <div class="modal-actions">
+        <button type="button" class="pill ghost" id="csvMapCancelBtn">cancelar</button>
+        <button type="button" class="pill primary" id="csvMapConfirmBtn">importar</button>
+      </div>
     </div>
   </div>
 
@@ -975,7 +1013,204 @@
     renderShelf();
   });
 
-  // ---------- Export / Import ----------
+  // ---------- Importar CSV genérico (mapeamento de colunas) ----------
+  const CAMPOS_MAPEAVEIS = [
+    { key: 'titulo', label: 'Título', obrigatorio: true, pistas: ['title', 'título', 'titulo', 'nome'] },
+    { key: 'autor', label: 'Autor', pistas: ['author', 'autor'] },
+    { key: 'ano', label: 'Ano da edição', pistas: ['year', 'ano', 'published'] },
+    { key: 'paginas', label: 'Páginas', pistas: ['page', 'página', 'pagina'] },
+    { key: 'editora', label: 'Editora', pistas: ['publisher', 'editora'] },
+    { key: 'serie', label: 'Série', pistas: ['series', 'série', 'serie', 'collection'] },
+    { key: 'serieNumero', label: 'Nº na série', pistas: ['series number', 'série #', 'volume', 'nº'] }
+  ];
+
+  let csvGenericoLinhas = [];
+
+  function adivinharColuna(headers, pistas){
+    const idx = headers.findIndex(h => pistas.some(p => h.toLowerCase().includes(p)));
+    return idx > -1 ? headers[idx] : '';
+  }
+
+  document.getElementById('importGenericBtn').addEventListener('click', ()=>{
+    document.getElementById('importGenericFile').click();
+  });
+
+  document.getElementById('importGenericFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    if(typeof Papa === 'undefined'){
+      alert('Não consegui carregar o leitor de CSV. Confira sua conexão e tente de novo.');
+      e.target.value = '';
+      return;
+    }
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results)=>{
+        csvGenericoLinhas = results.data || [];
+        const headers = results.meta.fields || [];
+        if(csvGenericoLinhas.length === 0 || headers.length === 0){
+          alert('Não encontrei linhas nesse CSV. Confira o arquivo.');
+          return;
+        }
+        montarMapeamentoCsv(headers, csvGenericoLinhas.length);
+      },
+      error: (err)=>{
+        console.error(err);
+        alert('Não consegui ler esse CSV.');
+      }
+    });
+    e.target.value = '';
+  });
+
+  function montarMapeamentoCsv(headers, totalLinhas){
+    const container = document.getElementById('csvMapFields');
+    container.innerHTML = '';
+    CAMPOS_MAPEAVEIS.forEach(campo=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+      const sugestao = adivinharColuna(headers, campo.pistas);
+      wrap.innerHTML = `
+        <label>${campo.label}${campo.obrigatorio ? ' *' : ''}</label>
+        <select data-campo="${campo.key}">
+          <option value="">— não usar —</option>
+          ${headers.map(h => `<option value="${escapeHtml(h)}" ${h === sugestao ? 'selected' : ''}>${escapeHtml(h)}</option>`).join('')}
+        </select>
+      `;
+      container.appendChild(wrap);
+    });
+    document.getElementById('csvMapStatus').textContent = `${totalLinhas} linha(s) encontradas no arquivo.`;
+    document.getElementById('csvMapOverlay').classList.add('open');
+  }
+
+  document.getElementById('csvMapCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('csvMapOverlay').classList.remove('open');
+    csvGenericoLinhas = [];
+  });
+
+  document.getElementById('csvMapConfirmBtn').addEventListener('click', ()=>{
+    const mapa = {};
+    document.querySelectorAll('#csvMapFields select[data-campo]').forEach(sel=>{
+      mapa[sel.dataset.campo] = sel.value;
+    });
+    if(!mapa.titulo){
+      alert('Escolha pelo menos qual coluna é o Título.');
+      return;
+    }
+    const statusPadrao = document.getElementById('csvStatusPadrao').value;
+    const possuiFisico = document.getElementById('csvPossuiFisico').checked;
+
+    let importados = 0;
+    csvGenericoLinhas.forEach(row=>{
+      const titulo = (row[mapa.titulo] || '').trim();
+      if(!titulo) return;
+      livros.unshift({
+        id: uid(),
+        titulo,
+        autor: mapa.autor ? (row[mapa.autor] || '').trim() : '',
+        ano: mapa.ano ? (row[mapa.ano] || '').trim() : '',
+        paginas: mapa.paginas ? (row[mapa.paginas] || '').trim() : '',
+        editora: mapa.editora ? (row[mapa.editora] || '').trim() : '',
+        serie: mapa.serie ? (row[mapa.serie] || '').trim() : '',
+        serieNumero: mapa.serieNumero ? (row[mapa.serieNumero] || '').trim() : '',
+        status: statusPadrao,
+        dataLeitura: '',
+        notas: '',
+        possuiFisico,
+        capaUrl: ''
+      });
+      importados++;
+    });
+
+    saveData();
+    render();
+    document.getElementById('csvMapOverlay').classList.remove('open');
+    csvGenericoLinhas = [];
+    alert(`Importação concluída: ${importados} livro(s) adicionados.`);
+  });
+
+  // ---------- Importar CSV do Goodreads ----------
+  document.getElementById('importGoodreadsBtn').addEventListener('click', ()=>{
+    document.getElementById('importGoodreadsFile').click();
+  });
+
+  function parseSerieDoTitulo(tituloBruto){
+    // Goodreads costuma exportar títulos como "Nome (Série, #3)"
+    const m = tituloBruto.match(/^(.*)\s\(([^,]+),\s*#?([\d.]+)\)\s*$/);
+    if(m){
+      return { titulo: m[1].trim(), serie: m[2].trim(), serieNumero: m[3].trim() };
+    }
+    return { titulo: tituloBruto.trim(), serie: '', serieNumero: '' };
+  }
+
+  function converterDataGoodreads(str){
+    if(!str) return '';
+    const partes = str.trim().split(/[\/\-]/);
+    if(partes.length !== 3) return '';
+    const [ano, mes] = partes;
+    if(!/^\d{4}$/.test(ano)) return '';
+    return `${ano}-${mes.padStart(2,'0')}`;
+  }
+
+  function mapearStatusGoodreads(shelf){
+    const s = (shelf||'').toLowerCase().trim();
+    if(s === 'read') return 'lido';
+    if(s === 'currently-reading') return 'lendo';
+    if(s === 'to-read') return 'quero-ler';
+    return 'quero-ler';
+  }
+
+  document.getElementById('importGoodreadsFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    if(typeof Papa === 'undefined'){
+      alert('Não consegui carregar o leitor de CSV. Confira sua conexão e tente de novo.');
+      e.target.value = '';
+      return;
+    }
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results)=>{
+        const linhas = results.data || [];
+        let importados = 0;
+        linhas.forEach(row=>{
+          const tituloBruto = (row['Title'] || '').trim();
+          if(!tituloBruto) return;
+          const { titulo, serie, serieNumero } = parseSerieDoTitulo(tituloBruto);
+          const shelf = row['Exclusive Shelf'] || '';
+          const status = mapearStatusGoodreads(shelf);
+          const ownedCopies = parseInt(row['Owned Copies'], 10) || 0;
+          const possuiFisico = ownedCopies > 0 ? true : (status === 'quero-ler' ? false : true);
+
+          livros.unshift({
+            id: uid(),
+            titulo,
+            autor: (row['Author'] || '').trim(),
+            ano: (row['Year Published'] || row['Original Publication Year'] || '').trim(),
+            paginas: (row['Number of Pages'] || '').trim(),
+            editora: (row['Publisher'] || '').trim(),
+            serie,
+            serieNumero,
+            status,
+            dataLeitura: status === 'lido' ? converterDataGoodreads(row['Date Read']) : '',
+            notas: '',
+            possuiFisico,
+            capaUrl: ''
+          });
+          importados++;
+        });
+        saveData();
+        render();
+        alert(`Importação concluída: ${importados} livro(s) adicionados a partir do Goodreads.\n\nVale conferir os campos de "posse física" — o Goodreads nem sempre tem essa informação certinha, então usei uma estimativa.`);
+      },
+      error: (err)=>{
+        console.error(err);
+        alert('Não consegui ler esse CSV. Confira se é o arquivo exportado direto do Goodreads.');
+      }
+    });
+    e.target.value = '';
+  });
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const blob = new Blob([JSON.stringify(livros, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
